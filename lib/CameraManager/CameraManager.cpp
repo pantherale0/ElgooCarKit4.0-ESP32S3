@@ -1,4 +1,5 @@
 #include "CameraManager.h"
+#include "CameraPins.h"
 
 CameraManager::CameraManager(RobotSettingManager *robotSettingManager)
 {
@@ -37,12 +38,19 @@ void CameraManager::init()
     config.xclk_freq_hz = 20000000;
     config.pixel_format = PIXFORMAT_JPEG;
     config.fb_count = 1;
-
+    config.frame_size = FRAMESIZE_HD;
+    config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
+    config.jpeg_quality = 10;
     // if PSRAM IC present, double frame buffer
     if (psramFound())
     {
+        config.fb_location = CAMERA_FB_IN_PSRAM;
         config.fb_count = 2;
         Serial.println("PSRAM found, doubling frame buffer for the camera");
+    } else {
+        // fb in dram
+        config.frame_size = FRAMESIZE_SVGA;
+        config.fb_location = CAMERA_FB_IN_DRAM;
     }
 
     // camera init
@@ -55,10 +63,20 @@ void CameraManager::init()
 
     sensor_t *cameraSensor = esp_camera_sensor_get();
 
+    if (cameraSensor->id.PID == OV3660_PID) {
+        cameraSensor->set_vflip(cameraSensor, 1); // flip it back
+        cameraSensor->set_brightness(cameraSensor, 1); // up the brightness just a bit
+        cameraSensor->set_saturation(cameraSensor, -2); // lower the saturation
+    } else if (cameraSensor->id.PID == OV2640_PID) {
+        cameraSensor->set_vflip(cameraSensor, 1); // flip it back
+        cameraSensor->set_hmirror(cameraSensor, 1);
+    } else {
+        cameraSensor->set_vflip(cameraSensor, 0);
+        cameraSensor->set_hmirror(cameraSensor, 0);
+    }
+
     cameraSensor->set_framesize(cameraSensor, (framesize_t)resolution);
     cameraSensor->set_quality(cameraSensor, quality);
-    cameraSensor->set_vflip(cameraSensor, 0);
-    cameraSensor->set_hmirror(cameraSensor, 0);
 }
 
 void CameraManager::changeResolution(int value)
